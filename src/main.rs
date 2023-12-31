@@ -1,8 +1,9 @@
-use std::{collections::HashMap, fs, ops::Deref};
+use std::{collections::HashMap, fs, ops::Deref, os::unix::thread};
 
 use log::debug;
 use rand::{
     distributions::{Distribution, WeightedIndex},
+    seq::{self, SliceRandom, IteratorRandom},
     thread_rng,
 };
 
@@ -17,24 +18,44 @@ impl StateMatrix {
         map.entry(key.to_string())
             .and_modify(|v| {
                 *v += 1;
-                debug!("Incremented '{key}' to {}", v);
             })
-            .or_insert_with(|| {
-                debug!("Inserting default value (1) for '{key}'");
-                1
-            });
+            .or_insert_with(|| 1);
     }
 
     pub fn insert(&mut self, curr_word: &String, next_possible_word: &String) {
         match self.matrix.get_mut(curr_word) {
             Some(valuemap) => {
+                debug!("Incrementing {curr_word} -> {next_possible_word}");
                 Self::increment(valuemap, next_possible_word);
             }
             None => {
                 let mut newmap = HashMap::new();
                 Self::increment(&mut newmap, next_possible_word);
+                debug!("Adding {curr_word} -> {next_possible_word}");
                 self.matrix.insert(curr_word.to_string(), newmap);
             }
+        }
+    }
+
+    pub fn calc(&self) {
+        let mut mat: HashMap<String, Vec<(String, i64)>> = HashMap::new();
+        for (key, valuemap) in &self.matrix {
+            let mut vec: Vec<(String, i64)> = Vec::new();
+            valuemap.iter().for_each(|(k, v)| {
+                vec.push((k.to_string(), *v));
+            });
+            debug!("{key} has {:?} entries", vec);
+            mat.insert(key.to_string(), vec);
+        }
+
+        let mut rng = thread_rng();
+        let mut word = mat.keys().choose(&mut rng).unwrap();
+        print!("{word} ");
+        for _ in 1..200 {
+            let balls = mat.get(word).unwrap();
+            let (w, _) = balls.choose_weighted(&mut rng, |item| item.1).unwrap();
+            print!("{w} ");
+            word = w;
         }
     }
 
@@ -109,7 +130,9 @@ fn analyse(text: &str) {
 
     // mat.print();
 
-    mat.next();
+    mat.calc();
+
+    // mat.next();
 
     //  0.25, 0.25, 0.50
 }
