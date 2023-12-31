@@ -1,7 +1,6 @@
-use std::{cmp::Ordering, collections::HashMap, fs::File};
+use std::{collections::HashMap, fs, ops::Deref};
 
 use log::debug;
-use multimap::MultiMap;
 use rand::{
     distributions::{Distribution, WeightedIndex},
     thread_rng,
@@ -39,9 +38,19 @@ impl StateMatrix {
         }
     }
 
+    // rand::seq::SliceRandom choose_weighted on tuple
+    // https://stackoverflow.com/questions/71092791/how-to-select-a-random-key-from-an-unorderedmap-in-near-rust-sdk
+
     pub fn next(&self) {
-        let mut start = self.matrix.get("I").unwrap();
-        print!("I");
+        use rand::seq::SliceRandom;
+
+        let keys: Vec<&String> = self.matrix.keys().collect();
+        let random_key = keys.choose(&mut thread_rng()).unwrap();
+
+        let mut start = self.matrix.get(*random_key).unwrap();
+
+        print!("{random_key}");
+
         for _ in 1..200 {
             // TODO optimize this
             let mut choices: Vec<&str> = vec![];
@@ -77,19 +86,10 @@ impl StateMatrix {
     }
 }
 
-fn analyse() {
-    let text = "I live in a house near the mountains.
-    I have two brothers and one sister, and I was born last.
-    My father teaches mathematics, and my mother is a nurse at
-    a big hospital. My brothers are very smart and work hard in
-    school. My sister is a nervous girl, but she is very kind.
-    My grandmother also lives with us. She came from Italy when
-    I was two years old. She has grown old, but she is still very
-    strong. She cooks the best food!";
-
+fn analyse(text: &str) {
     let split = text.split_ascii_whitespace();
     let vec: Vec<String> = split
-        // .map(|s| s.trim_matches(|c: char| c.is_ascii_punctuation()))
+        .map(|s| s.trim_matches(|c: char| c == '"' || c == '\''))
         .map(|w| w.to_string())
         // .map(|w| w.to_ascii_lowercase())
         .collect();
@@ -117,5 +117,6 @@ fn analyse() {
 fn main() {
     env_logger::init();
 
-    analyse();
+    let s = fs::read_to_string("./input1.txt").unwrap();
+    analyse(&s);
 }
