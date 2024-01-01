@@ -8,35 +8,39 @@ use rand::{
     thread_rng,
 };
 
-struct TransitionMatrix {
+struct TransitionMatrix<'a> {
     rng: ThreadRng,
     current_word: String,
-    matrix: HashMap<String, Vec<(String, i64)>>,
+    matrix: HashMap<&'a String, Vec<(&'a String, i64)>>,
 }
 
-impl TransitionMatrix {
+impl<'a> TransitionMatrix<'a> {
+    fn init_word(&mut self) {
+        self.current_word = self
+            .matrix
+            .keys()
+            .choose(&mut self.rng)
+            .expect("Could not choose an initial word!")
+            .to_string()
+    }
+
     pub fn new(map: &HashMap<String, HashMap<String, i64>>) -> TransitionMatrix {
         let mut mat = TransitionMatrix {
             rng: thread_rng(),
-            current_word: String::new(),
+            current_word: String::from(""),
             matrix: HashMap::new(),
         };
 
         for (key, valuemap) in map {
-            let mut vec: Vec<(String, i64)> = Vec::new();
+            let mut vec: Vec<(&String, i64)> = Vec::new();
             valuemap.iter().for_each(|(k, v)| {
-                vec.push((k.to_string(), *v));
+                vec.push((k, *v));
             });
             debug!("{key} has {:?} entries", vec);
-            mat.matrix.insert(key.to_string(), vec);
+            mat.matrix.insert(key, vec);
         }
 
-        mat.current_word = mat
-            .matrix
-            .keys()
-            .choose(&mut mat.rng)
-            .expect("Could not choose an initial word!")
-            .to_string();
+        mat.init_word();
 
         debug!("Current word is {}", mat.current_word);
 
@@ -44,21 +48,23 @@ impl TransitionMatrix {
     }
 }
 
-impl Iterator for TransitionMatrix {
+impl Iterator for TransitionMatrix<'_> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
-        let possibilities = self.matrix.get(&self.current_word).unwrap();
-        // debug!("===> {:?}", possibilities);
-        let (next_word, _) = possibilities
-            .choose_weighted(&mut self.rng, |item| item.1)
-            .unwrap();
-        self.current_word = next_word.to_string();
-        Some(next_word.to_string())
+        if let Some(v) = self.matrix.get(&self.current_word) {
+            // debug!("===> {:?}", possibilities);
+            let (next_word, _) = v.choose_weighted(&mut self.rng, |item| item.1).unwrap();
+            self.current_word = next_word.to_string();
+            Some(next_word.to_string())
+        } else {
+            self.init_word();
+            Some(self.current_word.to_string())
+        }
     }
 }
 
 struct Collector {
-    matrix: HashMap<String, HashMap<String, i64>>,
+    occurence_map: HashMap<String, HashMap<String, i64>>,
 }
 
 // https://docs.rs/rand/0.7.2/rand/distributions/weighted/struct.WeightedIndex.html
@@ -73,7 +79,7 @@ impl Collector {
     }
 
     pub fn insert(&mut self, curr_word: &String, next_possible_word: &String) {
-        match self.matrix.get_mut(curr_word) {
+        match self.occurence_map.get_mut(curr_word) {
             Some(valuemap) => {
                 debug!("Incrementing {curr_word} -> {next_possible_word}");
                 Self::increment(valuemap, next_possible_word);
@@ -82,20 +88,20 @@ impl Collector {
                 let mut newmap = HashMap::new();
                 Self::increment(&mut newmap, next_possible_word);
                 debug!("Adding {curr_word} -> {next_possible_word}");
-                self.matrix.insert(curr_word.to_string(), newmap);
+                self.occurence_map.insert(curr_word.to_string(), newmap);
             }
         }
     }
 
     pub fn transition_matrix(&mut self) -> TransitionMatrix {
-        TransitionMatrix::new(&self.matrix)
+        TransitionMatrix::new(&self.occurence_map)
     }
 
     // rand::seq::SliceRandom choose_weighted on tuple
     // https://stackoverflow.com/questions/71092791/how-to-select-a-random-key-from-an-unorderedmap-in-near-rust-sdk
 
     pub fn print(&self) {
-        for (key, valuemap) in &self.matrix {
+        for (key, valuemap) in &self.occurence_map {
             println!("{key}");
             for (key, value) in valuemap {
                 println!(" - {key} = {value}");
@@ -113,7 +119,7 @@ fn analyse(text: &str) {
         .collect();
 
     let mut mat = Collector {
-        matrix: HashMap::new(),
+        occurence_map: HashMap::new(),
     };
 
     let mut iterator = vec.iter();
@@ -128,7 +134,7 @@ fn analyse(text: &str) {
     // mat.print();
 
     let mut mat = mat.transition_matrix();
-    for _ in  1..200 {
+    for _ in 1..2000 {
         print!("{} ", mat.next().unwrap());
     }
 
@@ -137,19 +143,9 @@ fn analyse(text: &str) {
     //  0.25, 0.25, 0.50
 }
 
-fn map_to_vec<'a>(key: &String, map: &'a HashMap<String, String>) -> Vec<&'a String>{
-    let v = map.get(key);
-    vec![v.unwrap()]
-}
-
 fn main() {
     env_logger::init();
 
-    let mut mymap = HashMap::new();
-    mymap.insert(String::from("Kevin"), String::from("Pors"));
-    let v = map_to_vec(&String::from("Kevin"), &mymap);
-    println!("{:?}", v);
-
-    // let s = fs::read_to_string("./input1.txt").unwrap();
-    // analyse(&s);
+    let s = fs::read_to_string("./input1.txt").unwrap();
+    analyse(&s);
 }
