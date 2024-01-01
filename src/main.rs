@@ -1,11 +1,24 @@
 use std::{collections::HashMap, fs};
 
+use clap::Parser;
 use markov::Collector;
 
 mod markov;
 
+#[derive(Parser)]
+#[command(author, version, about)]
+struct Cli {
 
-fn analyse(text: &str) {
+    /// The filename containing the words to build the Markov chain from.
+    #[arg(short, long, value_name = "FILE")]
+    file: String,
+
+    /// The amount of words to generate using the input from `--file`.
+    #[arg(short, long)]
+    amount: u64,
+}
+
+fn analyse(text: &str, amt: u64) {
     let split = text.split_ascii_whitespace();
     let vec: Vec<String> = split
         .map(|s| s.trim_matches(|c: char| c == '"' || c == '\''))
@@ -27,15 +40,24 @@ fn analyse(text: &str) {
     // mat.print();
 
     let mut mat = mat.transition_matrix();
-    for _ in 1..2000 {
-        print!("{} ", mat.next().unwrap());
+    let mut cols = 0;
+    for _ in 1..amt {
+        let next = mat.next().unwrap();
+        print!("{next} ");
+        cols += next.len();
+        if cols >= 80 {
+            println!();
+            cols = 0;
+        }
     }
-
+    println!();
 }
 
 fn main() {
     env_logger::init();
 
-    let s = fs::read_to_string("./input1.txt").unwrap();
-    analyse(&s);
+    let cli = Cli::parse();
+
+    let s = fs::read_to_string(cli.file).unwrap();
+    analyse(&s, cli.amount);
 }
