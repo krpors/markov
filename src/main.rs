@@ -1,19 +1,69 @@
-use std::{collections::HashMap, fs, ops::Deref, os::unix::thread};
+use std::{collections::HashMap, fs, io::Error, ops::Deref, os::unix::thread};
 
 use log::debug;
 use rand::{
     distributions::{Distribution, WeightedIndex},
-    seq::{self, SliceRandom, IteratorRandom},
+    rngs::ThreadRng,
+    seq::{self, IteratorRandom, SliceRandom},
     thread_rng,
 };
 
-struct StateMatrix {
+struct TransitionMatrix {
+    rng: ThreadRng,
+    current_word: String,
+    matrix: HashMap<String, Vec<(String, i64)>>,
+}
+
+impl TransitionMatrix {
+    pub fn new(map: &HashMap<String, HashMap<String, i64>>) -> TransitionMatrix {
+        let mut mat = TransitionMatrix {
+            rng: thread_rng(),
+            current_word: String::new(),
+            matrix: HashMap::new(),
+        };
+
+        for (key, valuemap) in map {
+            let mut vec: Vec<(String, i64)> = Vec::new();
+            valuemap.iter().for_each(|(k, v)| {
+                vec.push((k.to_string(), *v));
+            });
+            debug!("{key} has {:?} entries", vec);
+            mat.matrix.insert(key.to_string(), vec);
+        }
+
+        mat.current_word = mat
+            .matrix
+            .keys()
+            .choose(&mut mat.rng)
+            .expect("Could not choose an initial word!")
+            .to_string();
+
+        debug!("Current word is {}", mat.current_word);
+
+        mat
+    }
+}
+
+impl Iterator for TransitionMatrix {
+    type Item = String;
+    fn next(&mut self) -> Option<Self::Item> {
+        let possibilities = self.matrix.get(&self.current_word).unwrap();
+        // debug!("===> {:?}", possibilities);
+        let (next_word, _) = possibilities
+            .choose_weighted(&mut self.rng, |item| item.1)
+            .unwrap();
+        self.current_word = next_word.to_string();
+        Some(next_word.to_string())
+    }
+}
+
+struct Collector {
     matrix: HashMap<String, HashMap<String, i64>>,
 }
 
 // https://docs.rs/rand/0.7.2/rand/distributions/weighted/struct.WeightedIndex.html
 
-impl StateMatrix {
+impl Collector {
     fn increment(map: &mut HashMap<String, i64>, key: &String) {
         map.entry(key.to_string())
             .and_modify(|v| {
@@ -37,65 +87,12 @@ impl StateMatrix {
         }
     }
 
-    pub fn calc(&self) {
-        let mut mat: HashMap<String, Vec<(String, i64)>> = HashMap::new();
-        for (key, valuemap) in &self.matrix {
-            let mut vec: Vec<(String, i64)> = Vec::new();
-            valuemap.iter().for_each(|(k, v)| {
-                vec.push((k.to_string(), *v));
-            });
-            debug!("{key} has {:?} entries", vec);
-            mat.insert(key.to_string(), vec);
-        }
-
-        let mut rng = thread_rng();
-        let mut word = mat.keys().choose(&mut rng).unwrap();
-        print!("{word} ");
-        for _ in 1..200 {
-            let balls = mat.get(word).unwrap();
-            let (w, _) = balls.choose_weighted(&mut rng, |item| item.1).unwrap();
-            print!("{w} ");
-            word = w;
-        }
+    pub fn transition_matrix(&mut self) -> TransitionMatrix {
+        TransitionMatrix::new(&self.matrix)
     }
 
     // rand::seq::SliceRandom choose_weighted on tuple
     // https://stackoverflow.com/questions/71092791/how-to-select-a-random-key-from-an-unorderedmap-in-near-rust-sdk
-
-    pub fn next(&self) {
-        use rand::seq::SliceRandom;
-
-        let keys: Vec<&String> = self.matrix.keys().collect();
-        let random_key = keys.choose(&mut thread_rng()).unwrap();
-
-        let mut start = self.matrix.get(*random_key).unwrap();
-
-        print!("{random_key}");
-
-        for _ in 1..200 {
-            // TODO optimize this
-            let mut choices: Vec<&str> = vec![];
-            let mut weights: Vec<i64> = vec![];
-            for (k, v) in start {
-                choices.push(k);
-                weights.push(*v);
-            }
-            let dist = WeightedIndex::new(&weights).unwrap();
-            let mut rng = thread_rng();
-
-            let sample = dist.sample(&mut rng);
-            let nextword = choices[sample];
-
-            print!(" {nextword}");
-
-            start = if let Some(x) = self.matrix.get(nextword) {
-                x
-            } else {
-                break;
-            }
-        }
-        println!();
-    }
 
     pub fn print(&self) {
         for (key, valuemap) in &self.matrix {
@@ -115,7 +112,7 @@ fn analyse(text: &str) {
         // .map(|w| w.to_ascii_lowercase())
         .collect();
 
-    let mut mat = StateMatrix {
+    let mut mat = Collector {
         matrix: HashMap::new(),
     };
 
@@ -130,16 +127,29 @@ fn analyse(text: &str) {
 
     // mat.print();
 
-    mat.calc();
+    let mut mat = mat.transition_matrix();
+    for _ in  1..200 {
+        print!("{} ", mat.next().unwrap());
+    }
 
     // mat.next();
 
     //  0.25, 0.25, 0.50
 }
 
+fn map_to_vec<'a>(key: &String, map: &'a HashMap<String, String>) -> Vec<&'a String>{
+    let v = map.get(key);
+    vec![v.unwrap()]
+}
+
 fn main() {
     env_logger::init();
 
-    let s = fs::read_to_string("./input1.txt").unwrap();
-    analyse(&s);
+    let mut mymap = HashMap::new();
+    mymap.insert(String::from("Kevin"), String::from("Pors"));
+    let v = map_to_vec(&String::from("Kevin"), &mymap);
+    println!("{:?}", v);
+
+    // let s = fs::read_to_string("./input1.txt").unwrap();
+    // analyse(&s);
 }
