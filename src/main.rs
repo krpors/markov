@@ -5,6 +5,8 @@ use markov::Collector;
 
 mod markov;
 
+/// Builds a Markov chain based on an input file, and generates an arbitrary
+/// amount of text based on the probabilities found.
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Cli {
