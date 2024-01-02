@@ -10,17 +10,22 @@ mod markov;
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Cli {
-
     /// The filename containing the words to build the Markov chain from.
     #[arg(short, long, value_name = "FILE")]
     file: String,
 
     /// The amount of words to generate using the input from `--file`.
+    /// If omitted, will output sequences until the command is aborted.
     #[arg(short, long)]
-    amount: u64,
+    amount: Option<u64>,
+
+    /// Emit a linebreak after this amount of characters. If not specified,
+    /// will disregard linebreaks.
+    #[arg(short, long)]
+    lf: Option<usize>,
 }
 
-fn analyse(text: &str, amt: u64) {
+fn run(text: &str, opts: &Cli) {
     let split = text.split_ascii_whitespace();
     let vec: Vec<String> = split
         .map(|s| s.trim_matches(|c: char| c == '"' || c == '\''))
@@ -39,17 +44,21 @@ fn analyse(text: &str, amt: u64) {
         prev_word = curr_word;
     }
 
-    // mat.print();
-
     let mut mat = mat.transition_matrix();
+
+    let mut count = 0;
+    let max = opts.amount.unwrap_or(u64::MAX);
     let mut cols = 0;
-    for _ in 1..amt {
-        let next = mat.next().unwrap();
-        print!("{next} ");
-        cols += next.len();
-        if cols >= 80 {
-            println!();
-            cols = 0;
+    for _ in 1..max {
+        let next_word = mat.next().unwrap();
+        print!("{next_word} ");
+
+        if let Some(break_after) = opts.lf {
+            cols += next_word.len();
+            if cols >= break_after {
+                println!();
+                cols = 0;
+            }
         }
     }
     println!();
@@ -60,6 +69,6 @@ fn main() {
 
     let cli = Cli::parse();
 
-    let s = fs::read_to_string(cli.file).unwrap();
-    analyse(&s, cli.amount);
+    let s = fs::read_to_string(&cli.file).unwrap();
+    run(&s, &cli);
 }

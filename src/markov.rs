@@ -10,7 +10,7 @@ use rand::{
 
 pub struct TransitionMatrix<'a> {
     rng: ThreadRng,
-    current_word: String,
+    current_word: &'a String,
     matrix: HashMap<&'a String, Vec<(&'a String, i64)>>,
 }
 
@@ -21,13 +21,13 @@ impl<'a> TransitionMatrix<'a> {
             .keys()
             .choose(&mut self.rng)
             .expect("Could not choose an initial word!")
-            .to_string()
     }
 
     pub fn new(map: &HashMap<String, HashMap<String, i64>>) -> TransitionMatrix {
         let mut mat = TransitionMatrix {
             rng: thread_rng(),
-            current_word: String::from(""),
+            // eh?
+            current_word: map.iter().next().unwrap().0,
             matrix: HashMap::new(),
         };
 
@@ -48,17 +48,17 @@ impl<'a> TransitionMatrix<'a> {
     }
 }
 
-impl Iterator for TransitionMatrix<'_> {
-    type Item = String;
+impl <'a> Iterator for TransitionMatrix<'a> {
+    type Item = &'a String;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(v) = self.matrix.get(&self.current_word) {
             // debug!("===> {:?}", possibilities);
             let (next_word, _) = v.choose_weighted(&mut self.rng, |item| item.1).unwrap();
-            self.current_word = next_word.to_string();
-            Some(next_word.to_string())
+            self.current_word = next_word;
+            Some(next_word)
         } else {
             self.init_word();
-            Some(self.current_word.to_string())
+            Some(self.current_word)
         }
     }
 }
@@ -107,11 +107,13 @@ impl Collector {
     // https://stackoverflow.com/questions/71092791/how-to-select-a-random-key-from-an-unorderedmap-in-near-rust-sdk
 
     pub fn print(&self) {
+        println!("The chain has {} entries", self.occurence_map.len());
         for (key, valuemap) in &self.occurence_map {
-            println!("{key}");
+            print!("{key} -> ");
             for (key, value) in valuemap {
-                println!(" - {key} = {value}");
+                print!("({key}:{value}), ");
             }
+            println!();
         }
     }
 }
