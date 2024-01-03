@@ -1,7 +1,7 @@
-use std::{collections::HashMap, fs};
+use std::{ fs};
 
 use clap::Parser;
-use markov::Collector;
+use markov::Chain;
 
 mod markov;
 
@@ -33,7 +33,7 @@ fn run(text: &str, opts: &Cli) {
         // .map(|w| w.to_ascii_lowercase())
         .collect();
 
-    let mut mat = Collector::new();
+    let mut mat = Chain::new();
 
     let mut iterator = vec.iter();
     // Skip the first iteration or else we don't have a 'prev_word' yet, when
@@ -46,7 +46,6 @@ fn run(text: &str, opts: &Cli) {
 
     let mut mat = mat.transition_matrix();
 
-    let mut count = 0;
     let max = opts.amount.unwrap_or(u64::MAX);
     let mut cols = 0;
     for _ in 1..max {
@@ -64,11 +63,14 @@ fn run(text: &str, opts: &Cli) {
     println!();
 }
 
+//
 fn main() {
     env_logger::init();
 
-    let cli = Cli::parse();
+    let mut chain: Chain<i32> = Chain::new();
 
-    let s = fs::read_to_string(&cli.file).unwrap();
-    run(&s, &cli);
+    // let cli = Cli::parse();
+
+    // let s = fs::read_to_string(&cli.file).unwrap();
+    // run(&s, &cli);
 }

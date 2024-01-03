@@ -1,114 +1,102 @@
-use std::{collections::HashMap, fs, io::Error, ops::Deref, os::unix::thread};
+use std::hash::Hash;
+use std::{collections::HashMap, fmt::Display};
 
-use log::debug;
-use rand::{
-    distributions::{Distribution, WeightedIndex},
-    rngs::ThreadRng,
-    seq::{self, IteratorRandom, SliceRandom},
-    thread_rng,
-};
+use rand::rngs::ThreadRng;
+use rand::seq::{IteratorRandom, SliceRandom};
+use rand::thread_rng;
 
-pub struct TransitionMatrix<'a> {
+pub struct TransitionMatrix<'a, K> {
     rng: ThreadRng,
-    current_word: &'a String,
-    matrix: HashMap<&'a String, Vec<(&'a String, i64)>>,
+    current: &'a K,
+    matrix: HashMap<&'a K, Vec<(&'a K, i64)>>,
 }
 
-impl<'a> TransitionMatrix<'a> {
+impl<'a, K: Hash + Eq + Display> TransitionMatrix<'a, K> {
     fn init_word(&mut self) {
-        self.current_word = self
+        self.current = self
             .matrix
             .keys()
             .choose(&mut self.rng)
             .expect("Could not choose an initial word!")
     }
 
-    pub fn new(map: &HashMap<String, HashMap<String, i64>>) -> TransitionMatrix {
+    fn new(map: &HashMap<K, HashMap<K, i64>>) -> TransitionMatrix<K> {
         let mut mat = TransitionMatrix {
             rng: thread_rng(),
-            // eh?
-            current_word: map.iter().next().unwrap().0,
+            // TODO: better way to get the current word?
+            current: map.iter().next().unwrap().0,
             matrix: HashMap::new(),
         };
 
         for (key, valuemap) in map {
-            let mut vec: Vec<(&String, i64)> = Vec::new();
+            let mut vec: Vec<(&K, i64)> = Vec::new();
             valuemap.iter().for_each(|(k, v)| {
                 vec.push((k, *v));
             });
-            debug!("{key} has {:?} entries", vec);
+            // debug!("{key} has {:?} entries", vec);
             mat.matrix.insert(key, vec);
         }
 
         mat.init_word();
 
-        debug!("Current word is {}", mat.current_word);
-
         mat
     }
 }
 
-impl <'a> Iterator for TransitionMatrix<'a> {
-    type Item = &'a String;
+
+impl <'a, K: Hash + Eq + Display> Iterator for TransitionMatrix<'a, K> {
+    type Item = &'a K;
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(v) = self.matrix.get(&self.current_word) {
-            // debug!("===> {:?}", possibilities);
+        if let Some(v) = self.matrix.get(&self.current) {
             let (next_word, _) = v.choose_weighted(&mut self.rng, |item| item.1).unwrap();
-            self.current_word = next_word;
+            self.current = next_word;
             Some(next_word)
         } else {
             self.init_word();
-            Some(self.current_word)
+            Some(self.current)
         }
     }
 }
 
-pub struct Collector {
-    occurence_map: HashMap<String, HashMap<String, i64>>,
+pub struct Chain<K> {
+    chain: HashMap<K, HashMap<K, i64>>,
 }
 
-// https://docs.rs/rand/0.7.2/rand/distributions/weighted/struct.WeightedIndex.html
-
-impl Collector {
-    pub fn new() -> Collector {
-        Collector {
-            occurence_map: HashMap::new()
+impl<K: Hash + Eq + Display> Chain<K> {
+    pub fn new() -> Chain<K> {
+        Chain {
+            chain: HashMap::new(),
         }
     }
 
-    fn increment(map: &mut HashMap<String, i64>, key: &String) {
-        map.entry(key.to_string())
+    fn increment(map: &mut HashMap<K, i64>, next: K) {
+        map.entry(next)
             .and_modify(|v| {
                 *v += 1;
             })
             .or_insert_with(|| 1);
     }
 
-    pub fn insert(&mut self, curr_word: &String, next_possible_word: &String) {
-        match self.occurence_map.get_mut(curr_word) {
+    pub fn insert(&mut self, current: K, next: K) {
+        match self.chain.get_mut(&current) {
             Some(valuemap) => {
-                debug!("Incrementing {curr_word} -> {next_possible_word}");
-                Self::increment(valuemap, next_possible_word);
+                Self::increment(valuemap, next);
             }
             None => {
                 let mut newmap = HashMap::new();
-                Self::increment(&mut newmap, next_possible_word);
-                debug!("Adding {curr_word} -> {next_possible_word}");
-                self.occurence_map.insert(curr_word.to_string(), newmap);
+                Self::increment(&mut newmap, next);
+                self.chain.insert(current, newmap);
             }
         }
     }
 
-    pub fn transition_matrix(&mut self) -> TransitionMatrix {
-        TransitionMatrix::new(&self.occurence_map)
+    pub fn transition_matrix(&mut self) -> TransitionMatrix<K> {
+        TransitionMatrix::new(&self.chain)
     }
 
-    // rand::seq::SliceRandom choose_weighted on tuple
-    // https://stackoverflow.com/questions/71092791/how-to-select-a-random-key-from-an-unorderedmap-in-near-rust-sdk
-
     pub fn print(&self) {
-        println!("The chain has {} entries", self.occurence_map.len());
-        for (key, valuemap) in &self.occurence_map {
+        println!("The chain has {} entries", self.chain.len());
+        for (key, valuemap) in &self.chain {
             print!("{key} -> ");
             for (key, value) in valuemap {
                 print!("({key}:{value}), ");
