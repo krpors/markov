@@ -5,6 +5,11 @@ use rand::rngs::ThreadRng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::thread_rng;
 
+/// The transition matrix can be used to iterate through the Markov-chain, by
+/// subsequently calling the `next()` function. The trait is implemented in
+/// such a way, that the Markov-chain never ends. Meaning that if a state is
+/// reached with no possible next states, a random new state will be chosen.
+/// As a result, it's possible to call `next` indefinitely.
 pub struct TransitionMatrix<'a, K> {
     rng: ThreadRng,
     current: &'a K,
@@ -134,10 +139,12 @@ impl<K: Hash + Eq + Display> Chain<K> {
 
     /// Generates a transition matrix from the initial chain. This matrix
     /// can be used to traverse the Markov-chain using the [Iterator] trait.
+    /// The matrix itself contains references to the values in the map.
     pub fn transition_matrix(&mut self) -> TransitionMatrix<K> {
         TransitionMatrix::new(&self.chain)
     }
 
+    /// Prints out the chain for inspection purposes.
     pub fn print(&self) {
         println!("The chain has {} entries", self.chain.len());
         for (key, valuemap) in &self.chain {
