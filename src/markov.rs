@@ -43,8 +43,7 @@ impl<'a, K: Hash + Eq + Display> TransitionMatrix<'a, K> {
     }
 }
 
-
-impl <'a, K: Hash + Eq + Display> Iterator for TransitionMatrix<'a, K> {
+impl<'a, K: Hash + Eq + Display> Iterator for TransitionMatrix<'a, K> {
     type Item = &'a K;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(v) = self.matrix.get(&self.current) {
@@ -58,11 +57,50 @@ impl <'a, K: Hash + Eq + Display> Iterator for TransitionMatrix<'a, K> {
     }
 }
 
+/// This struct contains functionality to build a discrete-time Markov chain,
+/// using any type that implements the traits [Hash], [Eq] and [Display].
+/// A Markov chain can be used to build a sequence of things using weighted randomness.
+///
+/// Example applications:
+/// - Generate sequences of words
+/// - Create music
+/// - Find a next state for an NPC in a game
+/// - ... and more.
+///
+/// The generic parameter `K` denotes the actual type to be put in the chain.
+/// For instance, it could be a `struct`, `String`, or any other type, as long
+/// as it implements the required traits. The Markov-chain itself is backed by
+/// a [HashMap].
+///
+/// For more thorough information on what a Markov chain is, consult the [Wikipedia page
+/// on Markov chains](https://en.wikipedia.org/wiki/Markov_chain).
+///
+/// Examples:
+///
+/// ```
+/// let mut chain = Chain::new();
+/// chain.insert("I", "see");
+/// chain.insert("you", "there");
+/// chain.insert("I", "know");
+/// chain.insert("you", "everytime");
+///
+/// let mut transmat = chain.transition_matrix();
+///
+/// for _ in 1..10 {
+///     print!("{} ", transmat.next().unwrap());
+/// }
+///
+/// // Possible output:
+///
+/// // everytime I see you everytime I know I see
+///
+/// ```
 pub struct Chain<K> {
     chain: HashMap<K, HashMap<K, i64>>,
 }
 
 impl<K: Hash + Eq + Display> Chain<K> {
+    /// Creates a new Markov-chain using a specified key type.
     pub fn new() -> Chain<K> {
         Chain {
             chain: HashMap::new(),
@@ -77,6 +115,8 @@ impl<K: Hash + Eq + Display> Chain<K> {
             .or_insert_with(|| 1);
     }
 
+    /// Insert two values in the chain, where `current` is the source state, and
+    /// `next` is a state which can be followed after `current`.
     pub fn insert(&mut self, current: K, next: K) {
         match self.chain.get_mut(&current) {
             Some(valuemap) => {
@@ -90,6 +130,8 @@ impl<K: Hash + Eq + Display> Chain<K> {
         }
     }
 
+    /// Generates a transition matrix from the initial chain. This matrix
+    /// can be used to traverse the Markov-chain using the [Iterator] trait.
     pub fn transition_matrix(&mut self) -> TransitionMatrix<K> {
         TransitionMatrix::new(&self.chain)
     }
