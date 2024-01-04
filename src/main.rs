@@ -3,8 +3,6 @@ use std::{ fs};
 use clap::Parser;
 use markov::Chain;
 
-mod markov;
-
 /// Builds a Markov chain based on an input file, and generates an arbitrary
 /// amount of text based on the probabilities found.
 #[derive(Parser)]
@@ -67,10 +65,7 @@ fn run(text: &str, opts: &Cli) {
 fn main() {
     env_logger::init();
 
-    let mut chain: Chain<i32> = Chain::new();
-
-    // let cli = Cli::parse();
-
-    // let s = fs::read_to_string(&cli.file).unwrap();
-    // run(&s, &cli);
+    let cli = Cli::parse();
+    let s = fs::read_to_string(&cli.file).unwrap();
+    run(&s, &cli);
 }

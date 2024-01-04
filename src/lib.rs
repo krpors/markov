@@ -78,6 +78,8 @@ impl<'a, K: Hash + Eq + Display> Iterator for TransitionMatrix<'a, K> {
 /// Examples:
 ///
 /// ```
+/// use markov::Chain;
+///
 /// let mut chain = Chain::new();
 /// chain.insert("I", "see");
 /// chain.insert("you", "there");
