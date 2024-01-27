@@ -17,18 +17,18 @@ pub struct TransitionMatrix<'a, K> {
 }
 
 impl<'a, K: Hash + Eq + Display> TransitionMatrix<'a, K> {
-    fn init_word(&mut self) {
+    fn init_state(&mut self) {
         self.current = self
             .matrix
             .keys()
             .choose(&mut self.rng)
-            .expect("Could not choose an initial word!")
+            .expect("Could not choose an initial state!")
     }
 
     fn new(map: &HashMap<K, HashMap<K, i64>>) -> TransitionMatrix<K> {
         let mut mat = TransitionMatrix {
             rng: thread_rng(),
-            // TODO: better way to get the current word?
+            // TODO: better way to get the initial state
             current: map.iter().next().unwrap().0,
             matrix: HashMap::new(),
         };
@@ -38,11 +38,11 @@ impl<'a, K: Hash + Eq + Display> TransitionMatrix<'a, K> {
             valuemap.iter().for_each(|(k, v)| {
                 vec.push((k, *v));
             });
-            // debug!("{key} has {:?} entries", vec);
+
             mat.matrix.insert(key, vec);
         }
 
-        mat.init_word();
+        mat.init_state();
 
         mat
     }
@@ -52,11 +52,11 @@ impl<'a, K: Hash + Eq + Display> Iterator for TransitionMatrix<'a, K> {
     type Item = &'a K;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(v) = self.matrix.get(&self.current) {
-            let (next_word, _) = v.choose_weighted(&mut self.rng, |item| item.1).unwrap();
-            self.current = next_word;
-            Some(next_word)
+            let (next_state, _) = v.choose_weighted(&mut self.rng, |item| item.1).unwrap();
+            self.current = next_state;
+            Some(next_state)
         } else {
-            self.init_word();
+            self.init_state();
             Some(self.current)
         }
     }
