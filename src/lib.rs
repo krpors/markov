@@ -156,3 +156,40 @@ impl<K: Hash + Eq + Display> Chain<K> {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::Chain;
+
+
+
+    #[test]
+    fn test_chain_and_matrix() {
+        let dna_strand = "AATCCGCTAGGATTACACCGGATTTATAGCGAGATAGACTTGAAGAACAGTGCAGATAATTATAGGGAACCCAGATAGATTGGTAGCAGA";
+
+        let mut chain = Chain::new();
+
+        let mut iter = dna_strand.chars().into_iter();
+        loop {
+            let first = iter.next();
+            let second = iter.next();
+
+            if first.is_some() && second.is_some() {
+                chain.insert(first.unwrap(), second.unwrap());
+                continue;
+            }
+
+            break;
+        }
+
+        let mut matrix = chain.transition_matrix();
+        print!("The nucleotide sequence is: ");
+        for _ in 0..200 {
+            let value = matrix.next().unwrap();
+            print!("{}", value);
+        }
+
+        println!();
+    }
+}

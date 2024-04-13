@@ -1,4 +1,4 @@
-use std::{ fs};
+use std::fs;
 
 use clap::Parser;
 use markov::Chain;
@@ -61,7 +61,7 @@ fn run(text: &str, opts: &Cli) {
     println!();
 }
 
-//
+
 fn main() {
     env_logger::init();
 
